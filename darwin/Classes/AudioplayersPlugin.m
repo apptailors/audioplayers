@@ -91,6 +91,10 @@ float _playbackRate = _pausePlaybackRate;
               methodChannelWithName:@"xyz.luan/audioplayers_callback"
                     binaryMessenger:_headlessEngine];
     #endif
+      NSError *setCategoryErr = nil;
+      NSError *activationErr  = nil;
+      [[AVAudioSession sharedInstance] setCategory: AVAudioSessionCategoryPlayback error:&setCategoryErr];
+      [[AVAudioSession sharedInstance] setActive:YES error:&activationErr];
   }
   return self;
 }
