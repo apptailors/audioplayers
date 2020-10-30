@@ -705,9 +705,7 @@ recordingActive: (bool) recordingActive
 
   [ player pause ];
   [playerInfo setObject:@false forKey:@"isPlaying"];
-    if (_infoCenter != nil) {
-      _infoCenter.playbackState = MPMusicPlaybackStatePaused;
-    }
+  [self setPlaybackRate:0.0 playerId:playerId];
 }
 
 -(void) resume: (NSString *) playerId {
@@ -725,9 +723,7 @@ recordingActive: (bool) recordingActive
     [player play];
   }
   [playerInfo setObject:@true forKey:@"isPlaying"];
-    if (_infoCenter != nil) {
-      _infoCenter.playbackState = MPMusicPlaybackStatePlaying;
-    }
+  [self setPlaybackRate:1.0 playerId:playerId];
 }
 
 -(void) setVolume: (float) volume
