@@ -705,6 +705,9 @@ recordingActive: (bool) recordingActive
 
   [ player pause ];
   [playerInfo setObject:@false forKey:@"isPlaying"];
+    if (_infoCenter != nil) {
+      _infoCenter.playbackState = MPMusicPlaybackStatePaused;
+    }
 }
 
 -(void) resume: (NSString *) playerId {
@@ -722,6 +725,9 @@ recordingActive: (bool) recordingActive
     [player play];
   }
   [playerInfo setObject:@true forKey:@"isPlaying"];
+    if (_infoCenter != nil) {
+      _infoCenter.playbackState = MPMusicPlaybackStatePlaying;
+    }
 }
 
 -(void) setVolume: (float) volume
@@ -781,6 +787,9 @@ recordingActive: (bool) recordingActive
     [ self pause:playerId ];
     [ self seek:playerId time:CMTimeMake(0, 1) ];
     [playerInfo setObject:@false forKey:@"isPlaying"];
+      if (_infoCenter != nil) {
+        _infoCenter.playbackState = MPMusicPlaybackStateStopped;
+      }
   }
 }
 
