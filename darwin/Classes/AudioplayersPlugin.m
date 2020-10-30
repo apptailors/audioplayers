@@ -54,8 +54,10 @@ NSString *_albumTitle;
 NSString *_artist;
 NSString *_imageUrl;
 int _duration;
-const float _defaultPlaybackRate = 1.0;
+const float _pausePlaybackRate = 0.0;
 const NSString *_defaultPlayingRoute = @"speakers";
+
+float _playbackRate = _pausePlaybackRate;
 
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
   _registrar = registrar;
@@ -312,7 +314,7 @@ const NSString *_defaultPlayingRoute = @"speakers";
 -(void) initPlayerInfo: (NSString *) playerId {
   NSMutableDictionary * playerInfo = players[playerId];
   if (!playerInfo) {
-    players[playerId] = [@{@"isPlaying": @false, @"volume": @(1.0), @"rate": @(_defaultPlaybackRate), @"looping": @(false), @"playingRoute": _defaultPlayingRoute} mutableCopy];
+    players[playerId] = [@{@"isPlaying": @false, @"volume": @(1.0), @"rate": @(_playbackRate), @"looping": @(false), @"playingRoute": _defaultPlayingRoute} mutableCopy];
   }
 }
 
@@ -487,7 +489,7 @@ const NSString *_defaultPlayingRoute = @"speakers";
 	        // From `MPNowPlayingInfoPropertyElapsedPlaybackTime` docs -- it is not recommended to update this value frequently. Thus it should represent integer seconds and not an accurate `CMTime` value with fractions of a second
           playingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = [NSNumber numberWithInt: elapsedTime];
 
-          playingInfo[MPNowPlayingInfoPropertyPlaybackRate] = @(_defaultPlaybackRate);
+          playingInfo[MPNowPlayingInfoPropertyPlaybackRate] = @(_playbackRate);
           NSLog(@"setNotification done");
 
           if (_infoCenter != nil) {
@@ -736,6 +738,7 @@ recordingActive: (bool) recordingActive
 
 -(void) setPlaybackRate: (float) playbackRate
         playerId:  (NSString *) playerId {
+  _playbackRate = playbackRate;
   NSLog(@"%@ -> calling setPlaybackRate", osName);
   
   NSMutableDictionary *playerInfo = players[playerId];
