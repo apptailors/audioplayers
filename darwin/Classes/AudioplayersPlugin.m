@@ -470,6 +470,16 @@ float _playbackRate = _pausePlaybackRate;
     }
 
     -(void) updateNotification: (int) elapsedTime {
+        if (_infoCenter != nil) {
+            if (@available(iOS 13.0, *)) {
+                if (_playbackRate == _playingPlaybackRate) {
+                    _infoCenter.playbackState = MPMusicPlaybackStatePlaying;
+                } else {
+                    _infoCenter.playbackState = MPMusicPlaybackStatePaused;
+                }
+            }
+        }
+        
       NSMutableDictionary *playingInfo = [NSMutableDictionary dictionary];
       playingInfo[MPMediaItemPropertyTitle] = _title;
       playingInfo[MPMediaItemPropertyAlbumTitle] = _albumTitle;
@@ -490,19 +500,12 @@ float _playbackRate = _pausePlaybackRate;
 	        // From `MPNowPlayingInfoPropertyElapsedPlaybackTime` docs -- it is not recommended to update this value frequently. Thus it should represent integer seconds and not an accurate `CMTime` value with fractions of a second
           playingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = [NSNumber numberWithInt: elapsedTime];
 
-          playingInfo[MPNowPlayingInfoPropertyPlaybackRate] = @(_playbackRate);
-          NSLog(@"setNotification done");
-
+          playingInfo[MPNowPlayingInfoPropertyPlaybackRate] = [NSNumber numberWithFloat: _playbackRate];
+          
           if (_infoCenter != nil) {
-            _infoCenter.nowPlayingInfo = playingInfo;
-              if (@available(iOS 13.0, *)) {
-                  if (_playbackRate == _playingPlaybackRate) {
-                      _infoCenter.playbackState = MPMusicPlaybackStatePlaying;
-                  } else {
-                      _infoCenter.playbackState = MPMusicPlaybackStatePaused;
-                  }
-              }
+              _infoCenter.nowPlayingInfo = playingInfo;
           }
+          NSLog(@"setNotification done");
       });
     }
 #endif
