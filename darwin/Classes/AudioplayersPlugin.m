@@ -449,6 +449,8 @@ float _playbackRate = _pausePlaybackRate;
                 [ self pause:_currentPlayerId ];
                 _isPlaying = false;
                 playerState = @"paused";
+                _playbackRate = _pausePlaybackRate;
+                [self updateNotification: 0];
             } else if (player.timeControlStatus == AVPlayerTimeControlStatusPaused) {
                 // player is paused and resume it
                 [ self resume:_currentPlayerId ];
@@ -509,6 +511,7 @@ float _playbackRate = _pausePlaybackRate;
           if (_infoCenter != nil) {
               _infoCenter.nowPlayingInfo = playingInfo;
           }
+          [[AVAudioSession sharedInstance] setActive:_playbackRate == _playingPlaybackRate error:nil];
           NSLog(@"setNotification done");
       });
     }
