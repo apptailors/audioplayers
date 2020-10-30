@@ -723,9 +723,6 @@ recordingActive: (bool) recordingActive
   [ player pause ];
   [playerInfo setObject:@false forKey:@"isPlaying"];
   [self setPlaybackRate:0.0 playerId:playerId];
-    if (remoteCommandCenter != nil) {
-        [remoteCommandCenter.playCommand setEnabled:YES];
-    }
 }
 
 -(void) resume: (NSString *) playerId {
@@ -744,9 +741,6 @@ recordingActive: (bool) recordingActive
   }
   [playerInfo setObject:@true forKey:@"isPlaying"];
   [self setPlaybackRate:1.0 playerId:playerId];
-    if (remoteCommandCenter != nil) {
-        [remoteCommandCenter.playCommand setEnabled:NO];
-    }
 }
 
 -(void) setVolume: (float) volume
