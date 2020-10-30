@@ -724,7 +724,7 @@ recordingActive: (bool) recordingActive
   [playerInfo setObject:@false forKey:@"isPlaying"];
   [self setPlaybackRate:0.0 playerId:playerId];
   NSError *activationErr  = nil;
-  [[AVAudioSession sharedInstance] setActive:YES error:&activationErr];
+  [[AVAudioSession sharedInstance] setActive:NO error:&activationErr];
 }
 
 -(void) resume: (NSString *) playerId {
