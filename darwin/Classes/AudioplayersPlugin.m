@@ -55,6 +55,7 @@ NSString *_artist;
 NSString *_imageUrl;
 int _duration;
 const float _pausePlaybackRate = 0.0;
+const float _playingPlaybackRate = 1.0;
 const NSString *_defaultPlayingRoute = @"speakers";
 
 float _playbackRate = _pausePlaybackRate;
@@ -494,6 +495,13 @@ float _playbackRate = _pausePlaybackRate;
 
           if (_infoCenter != nil) {
             _infoCenter.nowPlayingInfo = playingInfo;
+              if (@available(iOS 13.0, *)) {
+                  if (_playbackRate == _playingPlaybackRate) {
+                      _infoCenter.playbackState = MPMusicPlaybackStatePlaying;
+                  } else {
+                      _infoCenter.playbackState = MPMusicPlaybackStatePaused;
+                  }
+              }
           }
       });
     }
