@@ -180,7 +180,7 @@ float _playbackRate = _pausePlaybackRate;
                     bool recordingActive = [call.arguments[@"recordingActive"] boolValue];
                     bool duckAudio = [call.arguments[@"duckAudio"]boolValue] ;
 
-                    CMTime time = CMTimeMakeWithSeconds(milliseconds / 1000,NSEC_PER_SEC);
+                    CMTime time = CMTimeMake(milliseconds, 1000);
                     NSLog(@"isLocal: %d %@", isLocal, call.arguments[@"isLocal"] );
                     NSLog(@"volume: %f %@", volume, call.arguments[@"volume"] );
                     NSLog(@"position: %d %@", milliseconds, call.arguments[@"positions"] );
@@ -214,7 +214,7 @@ float _playbackRate = _pausePlaybackRate;
                     } else {
                       int milliseconds = [call.arguments[@"position"] intValue];
                       NSLog(@"Seeking to: %d milliseconds", milliseconds);
-                      [self seek:playerId time:CMTimeMakeWithSeconds(milliseconds / 1000,NSEC_PER_SEC)];
+                      [self seek:playerId time:CMTimeMake(milliseconds, 1000)];
                     }
                   },
                 @"setUrl":
