@@ -54,8 +54,11 @@ NSString *_albumTitle;
 NSString *_artist;
 NSString *_imageUrl;
 int _duration;
-const float _defaultPlaybackRate = 1.0;
+const float _pausePlaybackRate = 0.0;
+const float _playingPlaybackRate = 1.0;
 const NSString *_defaultPlayingRoute = @"speakers";
+
+float _playbackRate = _pausePlaybackRate;
 
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
   _registrar = registrar;
@@ -88,6 +91,10 @@ const NSString *_defaultPlayingRoute = @"speakers";
               methodChannelWithName:@"xyz.luan/audioplayers_callback"
                     binaryMessenger:_headlessEngine];
     #endif
+      NSError *setCategoryErr = nil;
+      NSError *activationErr  = nil;
+      [[AVAudioSession sharedInstance] setCategory: AVAudioSessionCategoryPlayback error:&setCategoryErr];
+      [[AVAudioSession sharedInstance] setActive:YES error:&activationErr];
   }
   return self;
 }
@@ -312,7 +319,7 @@ const NSString *_defaultPlayingRoute = @"speakers";
 -(void) initPlayerInfo: (NSString *) playerId {
   NSMutableDictionary * playerInfo = players[playerId];
   if (!playerInfo) {
-    players[playerId] = [@{@"isPlaying": @false, @"volume": @(1.0), @"rate": @(_defaultPlaybackRate), @"looping": @(false), @"playingRoute": _defaultPlayingRoute} mutableCopy];
+    players[playerId] = [@{@"isPlaying": @false, @"volume": @(1.0), @"rate": @(_playbackRate), @"looping": @(false), @"playingRoute": _defaultPlayingRoute} mutableCopy];
   }
 }
 
@@ -442,6 +449,8 @@ const NSString *_defaultPlayingRoute = @"speakers";
                 [ self pause:_currentPlayerId ];
                 _isPlaying = false;
                 playerState = @"paused";
+                _playbackRate = _pausePlaybackRate;
+                [self updateNotification: 0];
             } else if (player.timeControlStatus == AVPlayerTimeControlStatusPaused) {
                 // player is paused and resume it
                 [ self resume:_currentPlayerId ];
@@ -467,6 +476,16 @@ const NSString *_defaultPlayingRoute = @"speakers";
     }
 
     -(void) updateNotification: (int) elapsedTime {
+        if (_infoCenter != nil) {
+            if (@available(iOS 13.0, *)) {
+                if (_playbackRate == _playingPlaybackRate) {
+                    _infoCenter.playbackState = MPMusicPlaybackStatePlaying;
+                } else {
+                    _infoCenter.playbackState = MPMusicPlaybackStatePaused;
+                }
+            }
+        }
+        
       NSMutableDictionary *playingInfo = [NSMutableDictionary dictionary];
       playingInfo[MPMediaItemPropertyTitle] = _title;
       playingInfo[MPMediaItemPropertyAlbumTitle] = _albumTitle;
@@ -487,12 +506,13 @@ const NSString *_defaultPlayingRoute = @"speakers";
 	        // From `MPNowPlayingInfoPropertyElapsedPlaybackTime` docs -- it is not recommended to update this value frequently. Thus it should represent integer seconds and not an accurate `CMTime` value with fractions of a second
           playingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = [NSNumber numberWithInt: elapsedTime];
 
-          playingInfo[MPNowPlayingInfoPropertyPlaybackRate] = @(_defaultPlaybackRate);
-          NSLog(@"setNotification done");
-
+          playingInfo[MPNowPlayingInfoPropertyPlaybackRate] = [NSNumber numberWithFloat: _playbackRate];
+          
           if (_infoCenter != nil) {
-            _infoCenter.nowPlayingInfo = playingInfo;
+              _infoCenter.nowPlayingInfo = playingInfo;
           }
+          [[AVAudioSession sharedInstance] setActive:_playbackRate == _playingPlaybackRate error:nil];
+          NSLog(@"setNotification done");
       });
     }
 #endif
@@ -705,6 +725,7 @@ recordingActive: (bool) recordingActive
 
   [ player pause ];
   [playerInfo setObject:@false forKey:@"isPlaying"];
+  [self setPlaybackRate:0.0 playerId:playerId];
 }
 
 -(void) resume: (NSString *) playerId {
@@ -722,6 +743,7 @@ recordingActive: (bool) recordingActive
     [player play];
   }
   [playerInfo setObject:@true forKey:@"isPlaying"];
+  [self setPlaybackRate:1.0 playerId:playerId];
 }
 
 -(void) setVolume: (float) volume
@@ -734,6 +756,7 @@ recordingActive: (bool) recordingActive
 
 -(void) setPlaybackRate: (float) playbackRate
         playerId:  (NSString *) playerId {
+  _playbackRate = playbackRate;
   NSLog(@"%@ -> calling setPlaybackRate", osName);
   
   NSMutableDictionary *playerInfo = players[playerId];
@@ -781,6 +804,9 @@ recordingActive: (bool) recordingActive
     [ self pause:playerId ];
     [ self seek:playerId time:CMTimeMake(0, 1) ];
     [playerInfo setObject:@false forKey:@"isPlaying"];
+      if (_infoCenter != nil) {
+        _infoCenter.playbackState = MPMusicPlaybackStateStopped;
+      }
   }
 }
 
