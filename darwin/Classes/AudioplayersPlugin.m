@@ -548,7 +548,7 @@ float _playbackRate = _pausePlaybackRate;
       if (respectSilence) {
         success = [[AVAudioSession sharedInstance] setCategory:category withOptions:AVAudioSessionCategoryOptionMixWithOthers error:&error];
       } else {
-        success = [[AVAudioSession sharedInstance] setCategory:category error:&error];
+        success = [[AVAudioSession sharedInstance] setCategory:category withOptions:0x0 error:&error];
         [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
       }
       
