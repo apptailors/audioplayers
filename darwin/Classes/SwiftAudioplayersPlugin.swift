@@ -390,7 +390,7 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
                 player: nil,
                 observers: [],
                 isPlaying: false,
-                playbackRate: defaultPlaybackRate,
+                playbackRate: 0.0,
                 volume: 1.0,
                 playingRoute: defaultPlayingRoute,
                 looping: false,
@@ -399,25 +399,25 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
             )
         }
     }
-    
+
     func toCMTime(millis: Int) -> CMTime {
         return toCMTime(millis: Float(millis))
     }
-    
+
     func toCMTime(millis: Double) -> CMTime {
         return toCMTime(millis: Float(millis))
     }
-    
+
     func toCMTime(millis: Float) -> CMTime {
         return CMTimeMakeWithSeconds(Float64(millis) / 1000, preferredTimescale: Int32(NSEC_PER_SEC))
     }
-    
+
     func fromCMTime(time: CMTime) -> Int {
         let seconds: Float64 = CMTimeGetSeconds(time)
         let milliseconds: Int = Int(seconds * 1000)
         return milliseconds
     }
-    
+
     func play(
         playerId: String,
         url: String,
@@ -436,13 +436,13 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
             } else {
                 try AVAudioSession.sharedInstance().setCategory(category)
             }
-            
+
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
             log("Error setting category %@", error)
         }
         #endif
-        
+
         self.setUrl(
             playerId: playerId,
             url: url,
@@ -457,20 +457,24 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
             if let time = time {
                 player.seek(to: time)
             }
-            
+
             if #available(iOS 10.0, macOS 10.12, *) {
                 player.playImmediately(atRate: playerInfo.playbackRate)
             } else {
                 player.play()
             }
-            
+
             playerInfo.isPlaying = true
         }
         #if os(iOS)
         currentPlayerId = playerId // to be used for notifications command center
         #endif
+        if #available(iOS 13.0, *) {
+            infoCenter?.playbackState = .playing
+        }
+        try? AVAudioSession.sharedInstance().setActive(false)
     }
-    
+
     func setUrl(
         playerId: String,
         url: String,
@@ -480,15 +484,15 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
         onReady: @escaping VoidCallback
     ) {
         let playerInfo = players[playerId]!
-        
+
         log("setUrl %@", url)
-        
+
         #if os(iOS)
-        
+
         let category = recordingActive ? AVAudioSession.Category.playAndRecord : (
             isNotification ? AVAudioSession.Category.ambient : AVAudioSession.Category.playback
         )
-        
+
         do {
             // When using AVAudioSessionCategoryPlayback, by default, this implies that your app’s audio is nonmixable—activating your session
             // will interrupt any other audio sessions which are also nonmixable. AVAudioSessionCategoryPlayback should not be used with
@@ -496,33 +500,33 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
             if isNotification {
                 try AVAudioSession.sharedInstance().setCategory(category, options: AVAudioSession.CategoryOptions.mixWithOthers)
             } else {
-                try AVAudioSession.sharedInstance().setCategory(category)
+                try AVAudioSession.sharedInstance().setCategory(category, options: AVAudioSession.CategoryOptions(rawValue: 0))
                 UIApplication.shared.beginReceivingRemoteControlEvents()
             }
-            
+
             if playerInfo.playingRoute == "earpiece" {
                 // Use earpiece speaker to play audio.
                 try AVAudioSession.sharedInstance().setCategory(AVAudioSession.Category.playAndRecord)
             }
-            
+
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
             log("Error setting category %@", error)
         }
-        
+
         #endif
-        
+
         let playbackStatus = playerInfo.player?.currentItem?.status
-        
+
         if url != playerInfo.url || playbackStatus == .failed {
             let parsedUrl = isLocal ? URL.init(fileURLWithPath: url) : URL.init(string: url)!
             let playerItem = AVPlayerItem.init(url: parsedUrl)
-            
+
             let player: AVPlayer
             if let existingPlayer = playerInfo.player {
                 keyValueObservations[playerId]?.invalidate()
                 playerInfo.url = url
-                
+
                 for observer in playerInfo.observers {
                     NotificationCenter.default.removeObserver(observer.observer)
                 }
@@ -531,11 +535,11 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
                 player = existingPlayer
             } else {
                 player = AVPlayer.init(playerItem: playerItem)
-                
+
                 playerInfo.player = player
                 playerInfo.observers = []
                 playerInfo.url = url
-                
+
                 // stream player position
                 let interval: CMTime = toCMTime(millis: 0.2)
                 let timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: nil) {
@@ -544,23 +548,23 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
                 }
                 self.timeObservers.append(TimeObserver(player: player, observer: timeObserver))
             }
-            
+
             let anObserver = NotificationCenter.default.addObserver(forName: NSNotification.Name.AVPlayerItemDidPlayToEndTime, object: playerItem, queue: nil) {
                 [weak self] (notification) in
                 self!.onSoundComplete(playerId: playerId)
             }
             playerInfo.observers.append(TimeObserver(player: player, observer: anObserver))
-            
+
             // is sound ready
             playerInfo.onReady = onReady
             let newKeyValueObservation: NSKeyValueObservation = playerItem.observe(\AVPlayerItem.status) { (playerItem, change) in
                 let status = playerItem.status
                 log("player status: %@ change: %@", status, change)
-                
+
                 // Do something with the status...
                 if status == .readyToPlay {
                     self.updateDuration(playerId: playerId)
-                    
+
                     let onReady: VoidCallback? = playerInfo.onReady
                     if onReady != nil {
                         playerInfo.onReady = nil
@@ -570,7 +574,7 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
                     self.channel.invokeMethod("audio.onError", arguments: ["playerId": playerId, "value": "AVPlayerItem.Status.failed"])
                 }
             }
-            
+
             if let observation = keyValueObservations[playerId] {
                 observation.invalidate()
             }
@@ -581,11 +585,11 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
             }
         }
     }
-    
+
     func updateDuration(playerId: String) {
         let playerInfo: PlayerInfo = players[playerId]!
         let player = playerInfo.player!
-        
+
         let duration = player.currentItem!.asset.duration
         log("%@ -> updateDuration...%f", osName, CMTimeGetSeconds(duration))
         if CMTimeGetSeconds(duration) > 0 {
@@ -594,27 +598,27 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
             channel.invokeMethod("audio.onDuration", arguments: ["playerId": playerId, "value": mseconds])
         }
     }
-    
+
     func getDuration(playerId: String) -> Int {
         let playerInfo: PlayerInfo = players[playerId]!
         let player = playerInfo.player!
-        
+
         let duration: CMTime = player.currentItem!.asset.duration
         let mseconds: Int = self.fromCMTime(time: duration)
-        
+
         return mseconds
     }
-    
+
     func getCurrentPosition(playerId: String) -> Int {
         let playerInfo: PlayerInfo = players[playerId]!
         let player = playerInfo.player!
-        
+
         let duration: CMTime = player.currentTime()
         let mseconds: Int = self.fromCMTime(time: duration)
-        
+
         return mseconds
     }
-    
+
     func onTimeInterval(playerId: String, time: CMTime) {
         if isDealloc {
             return
@@ -622,64 +626,77 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
         let mseconds: Int = self.fromCMTime(time: time)
         channel.invokeMethod("audio.onCurrentPosition", arguments: ["playerId": playerId, "value": mseconds])
     }
-    
+
     func pause(playerId: String) {
         let playerInfo: PlayerInfo = players[playerId]!
         let player = playerInfo.player!
-        
+
         player.pause()
         playerInfo.isPlaying = false
+
+        if #available(iOS 13.0, *) {
+            infoCenter?.playbackState = .paused
+        }
+        try? AVAudioSession.sharedInstance().setActive(false)
+        setPlaybackRate(playerId: playerInfo.playerId, playbackRate: 0.0)
     }
-    
+
     func resume(playerId: String) {
+        if #available(iOS 13.0, *) {
+            infoCenter?.playbackState = .playing
+        }
+
+        try? AVAudioSession.sharedInstance().setActive(true)
+
         let playerInfo: PlayerInfo = players[playerId]!
         let player = playerInfo.player!
-        
+
         let playbackRate: Float = playerInfo.playbackRate
-        
+
         #if os(iOS)
         currentPlayerId = playerId // to be used for notifications command center
         #endif
-        
+
         if #available(iOS 10.0, macOS 10.12, *) {
             player.playImmediately(atRate: playbackRate)
         } else {
             player.play()
         }
         playerInfo.isPlaying = true
+        setPlaybackRate(playerId: playerInfo.playerId, playbackRate: 1.0)
     }
-    
+
     func setVolume(playerId: String, volume: Float) {
         let playerInfo: PlayerInfo = players[playerId]!
         let player = playerInfo.player!
-        
+
         player.volume = volume
         playerInfo.volume = volume
     }
-    
+
     func setPlaybackRate(playerId: String, playbackRate: Float) {
         log("%@ -> calling setPlaybackRate", osName)
-        
+
         let playerInfo: PlayerInfo = players[playerId]!
         let player = playerInfo.player!
-        
+
         playerInfo.playbackRate = playbackRate
         player.rate = playbackRate
         #if os(iOS)
         if infoCenter != nil {
             let currentItem = player.currentItem!
             let currentTime: CMTime = currentItem.currentTime()
-            self.updateNotification(time: currentTime)
+            self.updateNotification(time: currentTime, playbackRate: playbackRate)
         }
         #endif
     }
-    
+
     func setPlayingRoute(playerId: String, playingRoute: String) {
         log("%@ -> calling setPlayingRoute", osName)
-        
+
         let playerInfo: PlayerInfo = players[playerId]!
         playerInfo.playingRoute = playingRoute
-        
+
         #if os(iOS)
         let category = playingRoute == "earpiece" ? AVAudioSession.Category.playAndRecord : AVAudioSession.Category.playback
         do {
@@ -689,12 +706,12 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
         }
         #endif
     }
-    
+
     func setLooping(playerId: String, looping: Bool) {
         let playerInfo: PlayerInfo = players[playerId]!
         playerInfo.looping = looping
     }
-    
+
     func stop(playerId: String) {
         let playerInfo: PlayerInfo = players[playerId]!
         if playerInfo.isPlaying {
@@ -702,21 +719,25 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
             playerInfo.isPlaying = false
         }
         self.seek(playerId: playerId, time: toCMTime(millis: 0))
+        if #available(iOS 13.0, *) {
+            infoCenter?.playbackState = .stopped
+        }
+        UIApplication.shared.endReceivingRemoteControlEvents()
     }
-    
+
     func seek(playerId: String, time: CMTime) {
         let playerInfo: PlayerInfo = players[playerId]!
         let player = playerInfo.player
-        
+
         #if os(iOS)
         player?.currentItem?.seek(to: time) {
             finished in
             if finished {
                 log("ios -> seekComplete...")
                 if self.infoCenter != nil {
-                    self.updateNotification(time: time)
+                    self.updateNotification(time: time, playbackRate: nil)
                 }
-                
+
             }
             self.channel.invokeMethod("audio.onSeekComplete", arguments: ["playerId": playerId, "value": finished])
         }
@@ -724,25 +745,25 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
         player?.currentItem?.seek(to: time)
         #endif
     }
-    
+
     func onSoundComplete(playerId: String) {
         log("%@ -> onSoundComplete...", osName)
         let playerInfo: PlayerInfo = players[playerId]!
-        
+
         if !playerInfo.isPlaying {
             return
         }
-        
+
         self.pause(playerId: playerId)
-        
+
         if playerInfo.looping {
             self.seek(playerId: playerId, time: toCMTime(millis: 0))
             self.resume(playerId: playerId)
         }
-        
-        
+
+
         channel.invokeMethod("audio.onComplete", arguments: ["playerId": playerId])
-        
+
         #if os(iOS)
         let hasPlaying: Bool = players.values.contains { player in player.isPlaying }
         if !hasPlaying {
@@ -753,14 +774,14 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
             }
         }
         #endif
-        
+
         #if os(iOS)
         if headlessServiceInitialized {
             callbackChannel.invokeMethod("audio.onNotificationBackgroundPlayerStateChanged", arguments: ["playerId": playerId, "updateHandleMonitorKey": updateHandleMonitorKey as Any, "value": "completed"])
         }
         #endif
     }
-    
+
     // notifications
 
     #if os(iOS)
@@ -781,21 +802,21 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
             return UIImage.init(contentsOfFile: urlString)
         }
     }
-    
-    func updateNotification(time: CMTime) {
+
+    func updateNotification(time: CMTime, playbackRate: Float?) {
         // From `MPNowPlayingInfoPropertyElapsedPlaybackTime` docs -- it is not recommended to update this value frequently.
         // Thus it should represent integer seconds and not an accurate `CMTime` value with fractions of a second
         let elapsedTime = Int(time.seconds)
-        
+
         var playingInfo: [String: Any?] = [
             MPMediaItemPropertyTitle: title,
             MPMediaItemPropertyAlbumTitle: albumTitle,
             MPMediaItemPropertyArtist: artist,
             MPMediaItemPropertyPlaybackDuration: duration,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsedTime,
-            MPNowPlayingInfoPropertyPlaybackRate: defaultPlaybackRate
+            MPNowPlayingInfoPropertyPlaybackRate: playbackRate != nil ? NSNumber(value: playbackRate!) : nil
         ]
-        
+
         log("Updating playing info...")
 
         // fetch notification image in async fashion to avoid freezing UI
@@ -814,9 +835,19 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
                 log("Setting playing info: %@", filteredMap)
                 infoCenter.nowPlayingInfo = filteredMap
             }
+
+            if let rate = playbackRate {
+                let isPlaying = rate > 0.0
+                try? AVAudioSession.sharedInstance().setActive(isPlaying)
+                if #available(iOS 13.0, *) {
+                    self?.infoCenter?.playbackState = isPlaying ? .playing : .paused
+                }
+            }
         }
+
+
     }
-    
+
     func setNotification(
         playerId: String,
         title: String?,
@@ -837,7 +868,7 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
         self.duration = duration
 
         self.infoCenter = MPNowPlayingInfoCenter.default()
-        self.updateNotification(time: self.toCMTime(millis: elapsedTime))
+        self.updateNotification(time: self.toCMTime(millis: elapsedTime), playbackRate: 0.0)
 
         if (remoteCommandCenter == nil) {
             remoteCommandCenter = MPRemoteCommandCenter.shared()
