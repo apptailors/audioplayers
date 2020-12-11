@@ -1016,7 +1016,7 @@ public class SwiftAudioplayersPlugin: NSObject, FlutterPlugin {
         
         let positionTime = (changePositionEvent as! MPChangePlaybackPositionCommandEvent).positionTime
         log("changePlaybackPosition to %f", positionTime)
-        let newTime: CMTime = toCMTime(millis: positionTime)
+        let newTime: CMTime = CMTime.init(seconds: positionTime, preferredTimescale: Int32(NSEC_PER_SEC))
         self.seek(playerId: playerId, time: newTime)
         return MPRemoteCommandHandlerStatus.success
     }
