@@ -450,7 +450,6 @@ float _playbackRate = _pausePlaybackRate;
                 _isPlaying = false;
                 playerState = @"paused";
                 _playbackRate = _pausePlaybackRate;
-                [self updateNotification: 0];
             } else if (player.timeControlStatus == AVPlayerTimeControlStatusPaused) {
                 // player is paused and resume it
                 [ self resume:_currentPlayerId ];
@@ -476,16 +475,6 @@ float _playbackRate = _pausePlaybackRate;
     }
 
     -(void) updateNotification: (int) elapsedTime {
-        if (_infoCenter != nil) {
-            if (@available(iOS 13.0, *)) {
-                if (_playbackRate == _playingPlaybackRate) {
-                    _infoCenter.playbackState = MPMusicPlaybackStatePlaying;
-                } else {
-                    _infoCenter.playbackState = MPMusicPlaybackStatePaused;
-                }
-            }
-        }
-        
       NSMutableDictionary *playingInfo = [NSMutableDictionary dictionary];
       playingInfo[MPMediaItemPropertyTitle] = _title;
       playingInfo[MPMediaItemPropertyAlbumTitle] = _albumTitle;
@@ -511,6 +500,17 @@ float _playbackRate = _pausePlaybackRate;
           if (_infoCenter != nil) {
               _infoCenter.nowPlayingInfo = playingInfo;
           }
+
+          if (_infoCenter != nil) {
+              if (@available(iOS 13.0, *)) {
+                  if (_playbackRate == _playingPlaybackRate) {
+                      _infoCenter.playbackState = MPMusicPlaybackStatePlaying;
+                  } else {
+                      _infoCenter.playbackState = MPMusicPlaybackStatePaused;
+                  }
+              }
+          }
+
           [[AVAudioSession sharedInstance] setActive:_playbackRate == _playingPlaybackRate error:nil];
           NSLog(@"setNotification done");
       });
@@ -808,6 +808,8 @@ recordingActive: (bool) recordingActive
         _infoCenter.playbackState = MPMusicPlaybackStateStopped;
       }
   }
+
+  [[UIApplication sharedApplication] endReceivingRemoteControlEvents];
 }
 
 -(void) seek: (NSString *) playerId
