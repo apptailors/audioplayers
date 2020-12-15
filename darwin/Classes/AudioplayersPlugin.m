@@ -725,6 +725,9 @@ recordingActive: (bool) recordingActive
 
   [ player pause ];
   [playerInfo setObject:@false forKey:@"isPlaying"];
+
+  NSError *error = nil;
+  [[AVAudioSession sharedInstance] setActive:NO error:&error];
   [self setPlaybackRate:0.0 playerId:playerId];
 }
 
@@ -743,6 +746,8 @@ recordingActive: (bool) recordingActive
     [player play];
   }
   [playerInfo setObject:@true forKey:@"isPlaying"];
+  NSError *error = nil;
+  [[AVAudioSession sharedInstance] setActive:YES error:&error];
   [self setPlaybackRate:1.0 playerId:playerId];
 }
 
